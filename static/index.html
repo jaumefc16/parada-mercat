@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parada Mercat — Gestió de Comandes</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --verd:       #2E7D32;
+      --verd-clar:  #81C784;
+      --verd-bg:    #E8F5E9;
+      --taronja:    #E65100;
+      --taronja-bg: #FFF3E0;
+      --gris-clar:  #F5F5F5;
+      --gris-bord:  #E0E0E0;
+      --gris-text:  #757575;
+      --negre:      #212121;
+      --blanc:      #FFFFFF;
+      --error:      #C62828;
+      --error-bg:   #FFEBEE;
+    }
+
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--gris-clar); color: var(--negre); min-height: 100vh; }
+
+    /* ── Capçalera ── */
+    header { background: var(--verd); color: var(--blanc); padding: 14px 24px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+    header h1 { font-size: 1.2rem; font-weight: 700; }
+    header .sub { font-size: .8rem; opacity: .85; }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 0; background: #1B5E20; padding: 0 20px; }
+    .tab { padding: 11px 22px; color: rgba(255,255,255,.65); cursor: pointer; font-size: .9rem; font-weight: 600; border-bottom: 3px solid transparent; transition: all .2s; user-select: none; }
+    .tab:hover { color: var(--blanc); }
+    .tab.active { color: var(--blanc); border-bottom-color: var(--verd-clar); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Layout ── */
+    .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+    .full-width { padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+    /* ── Card ── */
+    .card { background: var(--blanc); border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.1); padding: 20px; }
+    .card-title { font-size: 1rem; font-weight: 700; color: var(--verd); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid var(--verd-bg); padding-bottom: 10px; }
+
+    /* ── Formulari ── */
+    label { font-size: .82rem; font-weight: 600; color: var(--gris-text); display: block; margin-bottom: 4px; }
+    .form-group { margin-bottom: 13px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    textarea, input[type="text"], input[type="number"], select {
+      width: 100%; border: 1.5px solid var(--gris-bord); border-radius: 6px;
+      padding: 8px 11px; font-size: .88rem; font-family: inherit;
+      transition: border-color .2s; background: var(--blanc);
+    }
+    textarea:focus, input:focus, select:focus { outline: none; border-color: var(--verd-clar); }
+    textarea { resize: vertical; min-height: 100px; }
+
+    /* ── Botons ── */
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border: none; border-radius: 6px; font-size: .88rem; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary   { background: var(--verd);    color: var(--blanc); }
+    .btn-secondary { background: var(--gris-clar); color: var(--negre); border: 1.5px solid var(--gris-bord); }
+    .btn-danger    { background: var(--error);   color: var(--blanc); }
+    .btn-taronja   { background: var(--taronja); color: var(--blanc); }
+    .btn-excel     { background: #1B5E20; color: var(--blanc); font-size: .95rem; padding: 11px 20px; width: 100%; justify-content: center; margin-top: 8px; }
+    .btn-icon      { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 3px 7px; border-radius: 4px; transition: background .2s; }
+    .btn-icon:hover { background: var(--error-bg); color: var(--error); }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+    /* ── Spinner ── */
+    .spinner { display: inline-block; width: 15px; height: 15px; border: 2.5px solid rgba(255,255,255,.4); border-top-color: var(--blanc); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Missatges ── */
+    .msg { padding: 9px 13px; border-radius: 6px; font-size: .85rem; margin-bottom: 10px; display: none; }
+    .msg.show { display: block; }
+    .msg-ok    { background: var(--verd-bg);  color: var(--verd);  border: 1px solid var(--verd-clar); }
+    .msg-error { background: var(--error-bg); color: var(--error); border: 1px solid #EF9A9A; }
+
+    /* ── Previsualització articles ── */
+    .preview-box { background: var(--verd-bg); border: 1.5px solid var(--verd-clar); border-radius: 8px; padding: 14px; margin-top: 4px; }
+    .preview-title { font-size: .82rem; font-weight: 700; color: var(--verd); margin-bottom: 8px; }
+
+    table.art-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    table.art-table th { background: var(--verd); color: var(--blanc); padding: 6px 9px; text-align: left; font-weight: 600; }
+    table.art-table td { padding: 5px 7px; border-bottom: 1px solid var(--gris-bord); vertical-align: middle; }
+    table.art-table tr:nth-child(even) td { background: var(--gris-clar); }
+    table.art-table input { padding: 4px 6px; font-size: .83rem; border: 1px solid var(--gris-bord); border-radius: 4px; width: 100%; }
+    table.art-table input[type="number"] { width: 75px; }
+
+    /* ── Stats ── */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .stat-box { background: var(--verd-bg); border-radius: 8px; padding: 11px; text-align: center; }
+    .stat-num   { font-size: 1.5rem; font-weight: 700; color: var(--verd); }
+    .stat-label { font-size: .72rem; color: var(--gris-text); margin-top: 2px; }
+
+    /* ── Llista comandes ── */
+    .comandes-list { display: flex; flex-direction: column; gap: 9px; max-height: 480px; overflow-y: auto; }
+    .comanda-card { border: 1.5px solid var(--gris-bord); border-radius: 8px; padding: 11px 13px; background: var(--blanc); position: relative; }
+    .comanda-card:hover { border-color: var(--verd-clar); }
+    .comanda-client { font-weight: 700; font-size: .92rem; }
+    .comanda-hora   { font-size: .78rem; color: var(--gris-text); }
+    .comanda-tel    { font-size: .78rem; color: var(--gris-text); }
+    .comanda-articles { font-size: .83rem; color: #424242; margin-top: 5px; }
+    .comanda-articles li { list-style: none; }
+    .comanda-articles li::before { content: "• "; color: var(--verd-clar); }
+    .comanda-del { position: absolute; top: 8px; right: 8px; color: var(--gris-text); font-size: .85rem; }
+
+    .empty-state { text-align: center; color: var(--gris-text); padding: 28px 0; font-size: .88rem; }
+    .empty-state .icon { font-size: 2.2rem; display: block; margin-bottom: 8px; }
+
+    /* ── Taula productes ── */
+    .prod-grid { display: flex; flex-direction: column; gap: 6px; }
+    .prod-row {
+      display: grid;
+      grid-template-columns: 2fr 80px 90px 80px 1fr 36px;
+      gap: 8px;
+      align-items: center;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1.5px solid var(--gris-bord);
+      background: var(--blanc);
+      transition: border-color .2s;
+    }
+    .prod-row:hover { border-color: var(--verd-clar); }
+    .prod-row.no-disp { background: #FFF8E1; border-color: #FFE082; }
+    .prod-row input, .prod-row select { font-size: .83rem; }
+
+    .badge-disp    { font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .badge-si      { background: var(--verd-bg); color: var(--verd); }
+    .badge-no      { background: #FFF3E0; color: var(--taronja); }
+
+    .prod-header { display: grid; grid-template-columns: 2fr 80px 90px 80px 1fr 36px; gap: 8px; padding: 5px 10px; font-size: .78rem; font-weight: 700; color: var(--gris-text); text-transform: uppercase; letter-spacing: .04em; }
+
+    .toggle-disp { cursor: pointer; font-size: 1.2rem; background: none; border: none; }
+
+    .btn-add-prod { width: 100%; border: 1.5px dashed var(--verd-clar); background: var(--verd-bg); color: var(--verd); border-radius: 6px; padding: 9px; font-weight: 600; cursor: pointer; margin-top: 8px; font-size: .88rem; }
+    .btn-add-prod:hover { background: #C8E6C9; }
+
+    .divider { border: none; border-top: 1.5px solid var(--gris-bord); margin: 14px 0; }
+
+    .info-box { background: var(--taronja-bg); border: 1px solid #FFCC02; border-radius: 8px; padding: 12px 14px; font-size: .85rem; color: #5D4037; margin-bottom: 14px; }
+    .info-box strong { color: var(--taronja); }
+
+    /* ── Simulador WhatsApp ── */
+    .wa-shell {
+      max-width: 420px; margin: 0 auto;
+      border-radius: 14px; overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,.18);
+      display: flex; flex-direction: column; height: 600px;
+    }
+    .wa-header {
+      background: #075E54; color: var(--blanc);
+      padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+    }
+    .wa-avatar { width: 38px; height: 38px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+    .wa-header-info .name  { font-weight: 700; font-size: .95rem; }
+    .wa-header-info .state { font-size: .75rem; opacity: .8; }
+    .wa-body {
+      flex: 1; overflow-y: auto; padding: 12px 14px;
+      background: #ECE5DD url("data:image/svg+xml,%3Csvg width='60' height='60' opacity='.04' xmlns='http://www.w3.org/2000/svg'%3E%3C/svg%3E");
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .wa-bubble {
+      max-width: 80%; padding: 8px 12px; border-radius: 8px;
+      font-size: .88rem; line-height: 1.45; position: relative; word-break: break-word;
+    }
+    .wa-bubble.client { background: var(--blanc); align-self: flex-end; border-bottom-right-radius: 2px; }
+    .wa-bubble.bot    { background: #DCF8C6;       align-self: flex-start; border-bottom-left-radius: 2px; }
+    .wa-bubble .time  { font-size: .68rem; color: #999; text-align: right; margin-top: 3px; }
+    .wa-bubble.typing { background: var(--blanc); align-self: flex-start; }
+    .wa-dots span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #aaa; margin: 0 2px; animation: dot-bounce .9s infinite; }
+    .wa-dots span:nth-child(2) { animation-delay: .15s; }
+    .wa-dots span:nth-child(3) { animation-delay: .3s; }
+    @keyframes dot-bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+    .wa-footer {
+      background: #F0F0F0; padding: 8px 10px;
+      display: flex; align-items: flex-end; gap: 8px;
+    }
+    .wa-input {
+      flex: 1; border: none; border-radius: 20px; padding: 9px 14px;
+      font-size: .9rem; font-family: inherit; resize: none; max-height: 100px;
+      line-height: 1.4; background: var(--blanc); outline: none;
+    }
+    .wa-send {
+      width: 42px; height: 42px; border-radius: 50%; border: none;
+      background: #075E54; color: var(--blanc); font-size: 1.1rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background .2s;
+    }
+    .wa-send:hover { background: #128C7E; }
+    .wa-send:disabled { background: #ccc; cursor: not-allowed; }
+
+    .wa-comanda-badge {
+      background: #25D366; color: var(--blanc); border-radius: 8px;
+      padding: 8px 12px; font-size: .82rem; margin-top: 4px;
+      align-self: flex-start; max-width: 85%;
+    }
+    .wa-comanda-badge strong { display: block; margin-bottom: 4px; }
+
+    .sim-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 20px; max-width: 1000px; margin: 0 auto; align-items: start; }
+    @media (max-width: 800px) { .sim-layout { grid-template-columns: 1fr; } }
+
+    .sim-info { display: flex; flex-direction: column; gap: 14px; }
+    .sim-info .card-title { font-size:.9rem; }
+    .sim-tip { background: var(--verd-bg); border-left: 3px solid var(--verd); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: .83rem; color: #2E5A31; }
+    .sim-tip strong { display: block; margin-bottom: 3px; }
+
+    .demo-name-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .demo-name-row input { border-radius: 20px; padding: 7px 14px; border: 1.5px solid var(--gris-bord); font-size: .85rem; flex: 1; }
+    .btn-reset-sim { background: none; border: 1.5px solid var(--gris-bord); border-radius: 20px; padding: 7px 14px; font-size: .82rem; cursor: pointer; color: var(--gris-text); }
+    .btn-reset-sim:hover { border-color: var(--error); color: var(--error); }
+  </style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.8rem">🥦</span>
+  <div>
+    <h1>Parada Mercat — Comandes WhatsApp</h1>
+    <div class="sub">El bot respon automàticament i guarda les comandes aquí</div>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="canviarTab('comandes')">📋 Comandes d'avui</div>
+  <div class="tab" onclick="canviarTab('productes')">🧺 Productes</div>
+  <div class="tab" onclick="canviarTab('manual')">✏️ Entrada manual</div>
+  <div class="tab" onclick="canviarTab('simulador')">💬 Simulador</div>
+</div>
+
+<!-- ══════════════ TAB: COMANDES ══════════════ -->
+<div id="tab-comandes" class="tab-content active">
+  <div class="main-grid">
+
+    <!-- Comandes bot -->
+    <div class="card">
+      <div class="card-title">🤖 Comandes rebudes pel bot</div>
+      <div id="msg-list" class="msg"></div>
+
+      <div class="stats">
+        <div class="stat-box"><div class="stat-num" id="stat-comandes">0</div><div class="stat-label">comandes</div></div>
+        <div class="stat-box"><div class="stat-num" id="stat-clients">0</div><div class="stat-label">clients</div></div>
+        <div class="stat-box"><div class="stat-num" id="stat-articles">0</div><div class="stat-label">articles</div></div>
+      </div>
+
+      <div class="comandes-list" id="comandes-list">
+        <div class="empty-state"><span class="icon">🤖</span>El bot encara no ha rebut cap comanda avui</div>
+      </div>
+    </div>
+
+    <!-- Accions -->
+    <div class="card">
+      <div class="card-title">📊 Accions del dia</div>
+
+      <div class="info-box">
+        <strong>Com funciona:</strong><br>
+        Els clients escriuen al número del mercat → el bot conversa amb ells → les comandes apareixen aquí automàticament.
+      </div>
+
+      <button class="btn btn-excel" onclick="descarregarExcel()">
+        📊 Descarregar Excel del dia
+      </button>
+      <p style="font-size:.78rem;color:var(--gris-text);margin-top:6px;text-align:center">Inclou dues fulles: comandes per client + resum total</p>
+
+      <hr class="divider" />
+
+      <div class="card-title" style="font-size:.9rem">🔄 Converses actives</div>
+      <div id="converses-actives" style="font-size:.83rem;color:var(--gris-text)">Cap conversa en curs ara mateix.</div>
+
+      <hr class="divider" />
+
+      <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="netejarTot()">
+        🗑️ Netejar totes les comandes d'avui
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ TAB: PRODUCTES ══════════════ -->
+<div id="tab-productes" class="tab-content">
+  <div class="full-width">
+    <div class="card">
+      <div class="card-title">🧺 Catàleg de productes</div>
+      <p style="font-size:.83rem;color:var(--gris-text);margin-bottom:14px">
+        El bot utilitza aquesta llista per informar els clients. Marca com a <strong>no disponible</strong> el que no tens avui.
+      </p>
+
+      <div id="msg-prod" class="msg"></div>
+
+      <div class="prod-header">
+        <span>Producte</span>
+        <span>Preu (€)</span>
+        <span>Unitat</span>
+        <span>Disponible</span>
+        <span>Nota</span>
+        <span></span>
+      </div>
+
+      <div class="prod-grid" id="prod-grid"></div>
+
+      <button class="btn-add-prod" onclick="afegirProducte()">+ Afegir producte</button>
+
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="desarProductes()">💾 Desar canvis</button>
+        <button class="btn btn-secondary" onclick="carregarProductes()">↺ Descartar canvis</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ TAB: SIMULADOR ══════════════ -->
+<div id="tab-simulador" class="tab-content">
+  <div class="sim-layout">
+
+    <!-- Xat WhatsApp fals -->
+    <div>
+      <div class="demo-name-row">
+        <input type="text" id="sim-nom" placeholder="El teu nom (com a client demo)…" value="Client demo" />
+        <button class="btn-reset-sim" onclick="resetSim()">🗑 Reiniciar xat</button>
+      </div>
+      <div class="wa-shell">
+        <div class="wa-header">
+          <div class="wa-avatar">🥦</div>
+          <div class="wa-header-info">
+            <div class="name">La Parada del Mercat</div>
+            <div class="state" id="wa-state">en línia</div>
+          </div>
+        </div>
+        <div class="wa-body" id="wa-body">
+          <div class="wa-bubble bot">
+            <div id="wa-llista-text" style="white-space:pre-line">…</div>
+            <div class="time" id="wa-init-time"></div>
+          </div>
+        </div>
+        <div class="wa-footer">
+          <textarea class="wa-input" id="wa-input" rows="1" placeholder="Escriu un missatge…"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarSim()}"
+            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+          <button class="wa-send" id="wa-send" onclick="enviarSim()">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info lateral -->
+    <div class="sim-info">
+      <div class="card">
+        <div class="card-title">💬 Com funciona el simulador</div>
+        <p style="font-size:.84rem;color:var(--gris-text);margin-bottom:12px">
+          Simula el grup de WhatsApp. El bot <strong>no respon</strong> — només escolta. Escriu la teva comanda i prem "Extreure comandes" per veure el resultat de final de dia.
+        </p>
+        <div class="sim-tip"><strong>Exemple:</strong> "Jo vull 2 kg de peres i 1 kg de tomàquets"</div>
+        <div class="sim-tip" style="margin-top:8px"><strong>Pots escriure diversos missatges</strong> com si fossin de clients diferents canviant el nom de dalt.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 Extreure comandes del dia</div>
+        <p style="font-size:.83rem;color:var(--gris-text);margin-bottom:10px">Simula el resum que el bot enviaria al grup a la nit.</p>
+        <button class="btn btn-primary" onclick="simExtreureComandes()" style="width:100%">📋 Extreure comandes ara</button>
+        <div id="sim-comandes-confirmades" style="font-size:.83rem;color:var(--gris-text);margin-top:12px">
+          Encara no s'han extret comandes.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ TAB: MANUAL ══════════════ -->
+<div id="tab-manual" class="tab-content">
+  <div class="main-grid">
+    <div class="card">
+      <div class="card-title">✏️ Afegir comanda manualment</div>
+      <p style="font-size:.82rem;color:var(--gris-text);margin-bottom:14px">Per a comandes telefòniques o en persona que vols afegir a la llista.</p>
+
+      <div id="msg-manual" class="msg"></div>
+
+      <div class="form-group">
+        <label>Missatge o descripció (opcional — l'IA l'analitzarà)</label>
+        <textarea id="m-missatge" placeholder="Ej: La Montse vol 2 kg de peres i una dotzena d'ous..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nom del client</label>
+          <input type="text" id="m-client" placeholder="Joan, Maria…" />
+        </div>
+        <div class="form-group">
+          <label>Telèfon</label>
+          <input type="text" id="m-telefon" placeholder="612 345 678" />
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-extreure" onclick="extreureManual()">🤖 Analitzar amb IA</button>
+        <button class="btn btn-secondary" onclick="mostrarPreviewBuida()">✏️ Escriure manualment</button>
+      </div>
+
+      <div id="preview" class="preview-box hidden" style="margin-top:14px">
+        <div class="preview-title">Articles — edita si cal:</div>
+        <div id="prev-client" style="font-size:.85rem;margin-bottom:8px"></div>
+        <table class="art-table">
+          <thead><tr><th>Article</th><th>Quantitat</th><th>Unitat</th><th></th></tr></thead>
+          <tbody id="art-tbody"></tbody>
+        </table>
+        <button style="width:100%;border:1.5px dashed var(--verd-clar);background:var(--verd-bg);color:var(--verd);border-radius:6px;padding:7px;margin-top:7px;cursor:pointer;font-size:.85rem" onclick="afegirFila()">+ Afegir article</button>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn btn-primary" onclick="guardarManual()">✅ Guardar comanda</button>
+          <button class="btn btn-secondary" onclick="resetManual()">Descartar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 Totes les comandes d'avui</div>
+      <div class="comandes-list" id="comandes-list-2">
+        <div class="empty-state"><span class="icon">🛒</span>Cap comanda encara</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Utils ─────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function mostrarMsg(id, text, tipus) {
+  const el = $(id);
+  el.textContent = text;
+  el.className = `msg show msg-${tipus}`;
+  setTimeout(() => el.className = "msg", 4500);
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function setLoading(btn, on) {
+  if (on) { btn.disabled = true; btn._orig = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> Processant…'; }
+  else     { btn.disabled = false; btn.innerHTML = btn._orig; }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function canviarTab(nom) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+  const noms = ["comandes","productes","manual","simulador"];
+  document.querySelectorAll(".tab")[noms.indexOf(nom)].classList.add("active");
+  $(`tab-${nom}`).classList.add("active");
+  if (nom === "comandes")   { carregarComandes(); carregarConverses(); }
+  if (nom === "productes")  carregarProductes();
+  if (nom === "manual")     carregarComandes2();
+  if (nom === "simulador")  $("wa-input").focus();
+}
+
+// ── Comandes ──────────────────────────────────────────────────────────────────
+async function carregarComandes() {
+  try {
+    const comandes = await (await fetch("/api/comandes")).json();
+    renderComandes(comandes, "comandes-list");
+    const clients = new Set(comandes.map(c => c.client)).size;
+    const arts    = comandes.reduce((s,c) => s+(c.articles||[]).length, 0);
+    $("stat-comandes").textContent = comandes.length;
+    $("stat-clients").textContent  = clients;
+    $("stat-articles").textContent = arts;
+  } catch { mostrarMsg("msg-list","Error carregant comandes.","error"); }
+}
+
+async function carregarComandes2() {
+  try {
+    const comandes = await (await fetch("/api/comandes")).json();
+    renderComandes(comandes, "comandes-list-2");
+  } catch {}
+}
+
+function renderComandes(comandes, containerId) {
+  const c = $(containerId);
+  if (!comandes.length) {
+    c.innerHTML = `<div class="empty-state"><span class="icon">🛒</span>Cap comanda avui</div>`;
+    return;
+  }
+  c.innerHTML = comandes.map(cmd => `
+    <div class="comanda-card">
+      <button class="btn-icon comanda-del" onclick="eliminarComanda('${cmd.id}')" title="Eliminar">✕</button>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="comanda-client">${esc(cmd.client)}</div>
+          ${cmd.telefon ? `<div class="comanda-tel">📞 ${esc(cmd.telefon)}</div>` : ""}
+        </div>
+        <div class="comanda-hora">${cmd.hora}</div>
+      </div>
+      <ul class="comanda-articles">
+        ${(cmd.articles||[]).map(a => `<li>${esc(a.nom)} — ${a.quantitat} ${esc(a.unitat)}</li>`).join("")}
+      </ul>
+    </div>
+  `).join("");
+}
+
+async function eliminarComanda(id) {
+  if (!confirm("Eliminar aquesta comanda?")) return;
+  await fetch(`/api/comandes/${id}`, { method:"DELETE" });
+  carregarComandes();
+  carregarComandes2();
+}
+
+async function netejarTot() {
+  if (!confirm("Eliminar TOTES les comandes d'avui? No es pot desfer.")) return;
+  await fetch("/api/comandes", { method:"DELETE" });
+  carregarComandes();
+  mostrarMsg("msg-list","Comandes eliminades.","ok");
+}
+
+async function descarregarExcel() {
+  const res = await fetch("/api/excel");
+  if (!res.ok) { const d=await res.json(); mostrarMsg("msg-list",d.detail||"Error.","error"); return; }
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url;
+  a.download = res.headers.get("Content-Disposition")?.split('filename="')[1]?.replace('"',"") || "comandes.xlsx";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Converses actives ─────────────────────────────────────────────────────────
+async function carregarConverses() {
+  try {
+    const data = await (await fetch("/api/converses")).json();
+    const keys = Object.keys(data);
+    const el = $("converses-actives");
+    if (!keys.length) { el.textContent = "Cap conversa en curs ara mateix."; return; }
+    el.innerHTML = keys.map(tel => {
+      const h = data[tel];
+      return `<div style="padding:5px 0;border-bottom:1px solid var(--gris-bord)">
+        📱 <strong>${esc(h.nom||tel)}</strong> — ${h.missatges} missatges — última: ${h.ultima_activitat}
+      </div>`;
+    }).join("");
+  } catch {}
+}
+
+// ── Productes ─────────────────────────────────────────────────────────────────
+let _productes = [];
+
+async function carregarProductes() {
+  try {
+    _productes = await (await fetch("/api/productes")).json();
+    renderProductes();
+  } catch { mostrarMsg("msg-prod","Error carregant productes.","error"); }
+}
+
+function renderProductes() {
+  const UNITATS = ["kg","g","unitat","unitats","manat","manats","dotzena","bossa","caixa","cap"];
+  const grid = $("prod-grid");
+  grid.innerHTML = "";
+  _productes.forEach(function(p, i) {
+    const row = document.createElement("div");
+    row.className = "prod-row " + (p.disponible ? "" : "no-disp");
+    row.dataset.idx = i;
+
+    const inNom = document.createElement("input");
+    inNom.type = "text"; inNom.value = p.nom || ""; inNom.placeholder = "Nom producte";
+    inNom.onchange = function() { updateProd(i, "nom", this.value); };
+
+    const inPreu = document.createElement("input");
+    inPreu.type = "number"; inPreu.value = p.preu != null ? p.preu : ""; inPreu.placeholder = "0.00";
+    inPreu.step = "0.05"; inPreu.min = "0";
+    inPreu.onchange = function() { updateProd(i, "preu", parseFloat(this.value) || null); };
+
+    const sel = document.createElement("select");
+    UNITATS.forEach(function(u) {
+      const opt = document.createElement("option");
+      opt.value = u; opt.textContent = u;
+      if (u === p.unitat) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = function() { updateProd(i, "unitat", this.value); };
+
+    const btnDisp = document.createElement("button");
+    btnDisp.className = "toggle-disp"; btnDisp.title = "Canviar disponibilitat";
+    btnDisp.textContent = p.disponible ? "✅" : "❌";
+    btnDisp.onclick = function() { toggleDisp(i); };
+
+    const inNota = document.createElement("input");
+    inNota.type = "text"; inNota.value = p.nota || ""; inNota.placeholder = "Nota opcional…";
+    inNota.onchange = function() { updateProd(i, "nota", this.value); };
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn-icon"; btnDel.title = "Eliminar"; btnDel.textContent = "🗑️";
+    btnDel.onclick = function() { eliminarProdLocal(i); };
+
+    row.append(inNom, inPreu, sel, btnDisp, inNota, btnDel);
+    grid.appendChild(row);
+  });
+}
+
+function updateProd(i, camp, val) { _productes[i][camp] = val; }
+
+function toggleDisp(i) {
+  _productes[i].disponible = !_productes[i].disponible;
+  renderProductes();
+}
+
+function eliminarProdLocal(i) {
+  if (!confirm(`Eliminar "${_productes[i].nom}"?`)) return;
+  _productes.splice(i, 1);
+  renderProductes();
+}
+
+function afegirProducte() {
+  _productes.push({ nom:"", preu:null, unitat:"kg", disponible:true, nota:"" });
+  renderProductes();
+  // Scroll al final
+  $("prod-grid").lastElementChild?.scrollIntoView({ behavior:"smooth" });
+}
+
+async function desarProductes() {
+  // Validar que tots tinguin nom
+  if (_productes.some(p => !p.nom.trim())) {
+    mostrarMsg("msg-prod","Tots els productes han de tenir nom.","error"); return;
+  }
+  try {
+    const res = await fetch("/api/productes", {
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(_productes)
+    });
+    if (!res.ok) throw new Error();
+    mostrarMsg("msg-prod","Productes desats correctament. El bot els farà servir immediatament.","ok");
+  } catch { mostrarMsg("msg-prod","Error desant productes.","error"); }
+}
+
+// ── Manual ────────────────────────────────────────────────────────────────────
+async function extreureManual() {
+  const missatge = $("m-missatge").value.trim();
+  if (!missatge) { mostrarMsg("msg-manual","Escriu primer el missatge o la descripció.","error"); return; }
+  const btn = $("btn-extreure");
+  setLoading(btn, true);
+  try {
+    const res  = await fetch("/api/extreure", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ missatge, nom_client: $("m-client").value.trim() }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail);
+    if (data.client) $("m-client").value = data.client;
+    mostrarPreview(data.articles||[]);
+  } catch (e) { mostrarMsg("msg-manual","Error IA: "+e.message,"error"); }
+  finally { setLoading(btn, false); }
+}
+
+function mostrarPreview(arts) {
+  renderFiles(arts);
+  $("preview").classList.remove("hidden");
+  actualitzarPrevClient();
+}
+
+function mostrarPreviewBuida() { mostrarPreview([{nom:"",quantitat:1,unitat:"kg"}]); }
+
+function actualitzarPrevClient() {
+  const nom = $("m-client").value.trim();
+  $("prev-client").innerHTML = nom
+    ? `Client: <strong style="color:var(--verd)">${esc(nom)}</strong>`
+    : `<span style="color:var(--gris-text)">Client no especificat</span>`;
+}
+$("m-client")?.addEventListener("input", actualitzarPrevClient);
+
+function renderFiles(arts) {
+  const tbody = $("art-tbody");
+  tbody.innerHTML = "";
+  arts.forEach(a => afegirFilaArticle(a.nom, a.quantitat, a.unitat));
+}
+
+function afegirFilaArticle(nom="", qty=1, unitat="kg") {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input type="text"   class="art-nom"  value="${esc(nom)}"  placeholder="Nom" /></td>
+    <td><input type="number" class="art-qty"  value="${qty}" min="0" step="0.1" /></td>
+    <td><select class="art-unit">${["kg","g","unitats","manats","bosses","caixes","dotzenes"].map(u=>`<option${u===unitat?" selected":""}>${u}</option>`).join("")}</select></td>
+    <td><button class="btn-icon" onclick="this.closest('tr').remove()">✕</button></td>
+  `;
+  $("art-tbody").appendChild(tr);
+}
+
+function afegirFila() { afegirFilaArticle(); }
+
+async function guardarManual() {
+  const client = $("m-client").value.trim() || "Desconegut";
+  const articles = [];
+  document.querySelectorAll("#art-tbody tr").forEach(tr => {
+    const nom = tr.querySelector(".art-nom").value.trim();
+    const qty = parseFloat(tr.querySelector(".art-qty").value)||0;
+    const uni = tr.querySelector(".art-unit").value;
+    if (nom) articles.push({nom, quantitat:qty, unitat:uni});
+  });
+  if (!articles.length) { mostrarMsg("msg-manual","Afegeix almenys un article.","error"); return; }
+  try {
+    const res = await fetch("/api/comandes", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ client, telefon:$("m-telefon").value.trim(), missatge_original:$("m-missatge").value.trim(), articles }) });
+    if (!res.ok) throw new Error();
+    mostrarMsg("msg-manual",`Comanda de ${client} guardada!`,"ok");
+    resetManual();
+    carregarComandes2();
+  } catch { mostrarMsg("msg-manual","Error guardant.","error"); }
+}
+
+function resetManual() {
+  $("m-missatge").value=""; $("m-client").value=""; $("m-telefon").value="";
+  $("preview").classList.add("hidden");
+  $("art-tbody").innerHTML="";
+}
+
+// ── Simulador WhatsApp ────────────────────────────────────────────────────────
+let _simEnviant = false;
+let _simComandes = [];
+const SIM_TEL = "demo-simulator";
+
+function horaAra() {
+  return new Date().toLocaleTimeString("ca", { hour:"2-digit", minute:"2-digit" });
+}
+
+function afegirBombolla(text, tipus) {
+  const body = $("wa-body");
+  const div  = document.createElement("div");
+  div.className = `wa-bubble ${tipus}`;
+  // Convertir salts de línia en <br>
+  div.innerHTML = text.replace(/\n/g,"<br>") + `<div class="time">${horaAra()}</div>`;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+function mostrarTyping() {
+  const body = $("wa-body");
+  const div  = document.createElement("div");
+  div.className = "wa-bubble typing";
+  div.id = "wa-typing";
+  div.innerHTML = `<div class="wa-dots"><span></span><span></span><span></span></div>`;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function ocultarTyping() {
+  $("wa-typing")?.remove();
+}
+
+// Missatges guardats durant la simulació: [{nom, telefon, text}]
+const _simMissatges = [];
+
+function enviarSim() {
+  const input = $("wa-input");
+  const text  = input.value.trim();
+  if (!text) return;
+
+  const nom     = $("sim-nom").value.trim() || "Client demo";
+  const telefon = "sim-" + nom.toLowerCase().replace(/\s+/g, "-");
+
+  input.value = "";
+  input.style.height = "auto";
+
+  afegirBombolla(text, "client");
+
+  // Guardar en silenci (el bot real no respon)
+  _simMissatges.push({ nom, telefon, text });
+  $("wa-body").scrollTop = $("wa-body").scrollHeight;
+  $("wa-input").focus();
+}
+
+async function simExtreureComandes() {
+  if (_simMissatges.length === 0) {
+    alert("Primer escriu algun missatge al xat.");
+    return;
+  }
+
+  const el = $("sim-comandes-confirmades");
+  el.textContent = "Extraient comandes…";
+
+  // Agrupar per client
+  const perClient = {};
+  for (const m of _simMissatges) {
+    if (!perClient[m.telefon]) perClient[m.telefon] = { nom: m.nom, textos: [] };
+    perClient[m.telefon].textos.push(m.text);
+  }
+
+  let html = "";
+  let total = 0;
+
+  for (const [tel, data] of Object.entries(perClient)) {
+    try {
+      const res = await fetch("/api/extreure", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ missatge: data.textos.join("\n"), nom_client: data.nom }),
+      });
+      const comanda = await res.json();
+      if (!comanda.articles || comanda.articles.length === 0) continue;
+
+      // Guardar la comanda
+      await fetch("/api/comandes", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          client:   comanda.client || data.nom || tel,
+          telefon:  tel,
+          missatge_original: data.textos.join("\n"),
+          articles: comanda.articles,
+        }),
+      });
+
+      html += `<div style="border:1px solid var(--gris-bord);border-radius:6px;padding:8px 10px;margin-bottom:6px">
+        <strong>${esc(comanda.client || data.nom)}</strong>
+        <ul style="margin-top:4px;padding-left:16px;font-size:.81rem">
+          ${comanda.articles.map(a=>`<li>${esc(a.nom)} — ${a.quantitat} ${esc(a.unitat)}</li>`).join("")}
+        </ul>
+      </div>`;
+      total++;
+    } catch {}
+  }
+
+  el.innerHTML = total
+    ? html + `<p style="margin-top:6px;color:var(--verd);font-weight:600">✅ ${total} comand${total===1?"a":"es"} guardades</p>`
+    : `<p style="color:var(--error)">No s'han pogut extreure comandes dels missatges.</p>`;
+
+  carregarComandes();
+}
+
+
+async function carregarLlistaSimulador(contenidor) {
+  try {
+    const r = await fetch("/api/llista-divendres");
+    const d = await r.json();
+    contenidor.textContent = d.text;
+  } catch {
+    contenidor.textContent = "Hola! 👋 Soc l'assistent de la parada. Escriu-me què necessites i t'ajudo! 🥦🍅";
+  }
+}
+
+function resetSim() {
+  _simMissatges.length = 0;
+  $("sim-comandes-confirmades").textContent = "Encara no s'han extret comandes.";
+  const body = $("wa-body");
+  const div = document.createElement("div");
+  div.className = "wa-bubble bot";
+  const txt = document.createElement("div");
+  txt.style.whiteSpace = "pre-line";
+  div.appendChild(txt);
+  const time = document.createElement("div");
+  time.className = "time";
+  time.textContent = horaAra();
+  div.appendChild(time);
+  body.innerHTML = "";
+  body.appendChild(div);
+  carregarLlistaSimulador(txt);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener("load", () => {
+  const t = $("wa-init-time");
+  if (t) t.textContent = horaAra();
+  const llistaEl = $("wa-llista-text");
+  if (llistaEl) carregarLlistaSimulador(llistaEl);
+
+  document.querySelectorAll(".preview-box").forEach(el => el.classList.add("hidden"));
+
+  carregarComandes();
+  carregarConverses();
+
+  setInterval(() => {
+    if (document.querySelector(".tab.active")?.textContent.includes("Comandes")) {
+      carregarComandes();
+      carregarConverses();
+    }
+  }, 15000);
+});
+</script>
+</body>
+</html>

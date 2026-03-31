@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+.wwebjs_auth/
+node_modules/
+data/

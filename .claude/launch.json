@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "FastAPI — Servidor Python",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["main:app", "--reload", "--port", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "WhatsApp Bot — Node.js",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["bot.js"],
+      "port": null
+    }
+  ]
+}
