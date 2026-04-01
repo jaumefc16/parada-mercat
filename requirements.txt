@@ -3,3 +3,4 @@ uvicorn
 openpyxl
 anthropic
 python-multipart
+fpdf2

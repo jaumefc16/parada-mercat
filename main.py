@@ -19,6 +19,7 @@ from typing import Optional
 import storage
 import extractor
 import excel_generator
+import pdf_generator
 import productes as productes_mod
 import conversa as conversa_mod
 
@@ -186,14 +187,44 @@ def api_excel():
     )
 
 
+# ── PDFs ──────────────────────────────────────────────────────────────────────
+
+from fastapi.responses import Response as FastAPIResponse
+
+@app.get("/api/pdf/clients")
+def api_pdf_clients():
+    comandes = storage.obtenir_comandes_avui()
+    pdf_bytes = pdf_generator.generar_pdf_clients(comandes)
+    nom = f"comandes_clients_{date.today().isoformat()}.pdf"
+    return FastAPIResponse(content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nom}"'})
+
+@app.get("/api/pdf/preparacio")
+def api_pdf_preparacio():
+    comandes = storage.obtenir_comandes_avui()
+    pdf_bytes = pdf_generator.generar_pdf_preparacio(comandes)
+    nom = f"preparacio_{date.today().isoformat()}.pdf"
+    return FastAPIResponse(content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nom}"'})
+
+
 # ── Llista de divendres ───────────────────────────────────────────────────────
 
 @app.get("/api/llista-divendres")
 def api_llista_divendres():
-    path = Path(__file__).parent / "llista_divendres.txt"
-    if not path.exists():
+    p = Path(__file__).parent / "llista_divendres.txt"
+    if not p.exists():
         raise HTTPException(status_code=404, detail="llista_divendres.txt no trobat.")
-    return {"text": path.read_text(encoding="utf-8").strip()}
+    return {"text": p.read_text(encoding="utf-8").strip()}
+
+class LlistaBody(BaseModel):
+    text: str
+
+@app.put("/api/llista-divendres")
+def api_desar_llista(body: LlistaBody):
+    p = Path(__file__).parent / "llista_divendres.txt"
+    p.write_text(body.text.strip(), encoding="utf-8")
+    return {"ok": True}
 
 
 # ── Productes ─────────────────────────────────────────────────────────────────

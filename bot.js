@@ -3,7 +3,7 @@
  *
  * Flux setmanal:
  *  - Divendres 09:00 → envia la llista de productes al grup (llista_divendres.txt)
- *  - Durant el dia  → respon a cada membre que escrigui, conversa i pren la comanda
+ *  - Durant el dia  → escolta missatges silenciosament (sense respondre)
  *  - Divendres 21:00 → extreu totes les comandes del dia i envia el resum al grup
  *
  * Configuració (.env):
@@ -13,10 +13,10 @@
  *  API_URL=http://localhost:8000         ← opcional
  *
  * Per arrencar:
- *  1. Arrenca el servidor Python: uvicorn main:app --port 8000
- *  2. npm install   (primera vegada)
- *  3. node bot.js
- *  4. Escaneja el QR amb el mòbil del mercat
+ *  node bot.js              ← mode normal (divendres automàtic)
+ *  node bot.js --demo       ← mode demo (5 minuts d'intent)
+ *  node bot.js --test-llista  ← envia la llista ara
+ *  node bot.js --test-resum   ← envia el resum ara
  */
 
 const { Client, LocalAuth } = require("whatsapp-web.js");
@@ -46,8 +46,35 @@ const GRUP_ID     = process.env.GRUP_ID    || "";
 const HORA_LLISTA = parseInt(process.env.HORA_LLISTA || "9",  10);
 const HORA_RESUM  = parseInt(process.env.HORA_RESUM  || "21", 10);
 
-// Missatges rebuts durant el dia: [{ nom, telefon, text }]
-const _missatgesDia = [];
+// Mode demo: si --demo, espera només 5 minuts entre llista i resum
+const MODE_DEMO = process.argv.includes("--demo");
+const MINUTS_DEMO = 5;
+
+// ── Persistència de missatges a disc ─────────────────────────────────────────
+
+const DATA_DIR      = path.join(__dirname, "data");
+const MISSATGES_PATH = path.join(DATA_DIR, "missatges_dia.json");
+
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+
+// Carregar missatges del dia si el fitxer existeix (recuperació després de reinici)
+const _missatgesDia = (() => {
+  try {
+    if (fs.existsSync(MISSATGES_PATH)) {
+      const data = JSON.parse(fs.readFileSync(MISSATGES_PATH, "utf8"));
+      // Només carregar si són del dia d'avui
+      const avui = new Date().toISOString().slice(0, 10);
+      const filtered = data.filter(m => m.data === avui);
+      if (filtered.length > 0) console.log(`📂 Recuperats ${filtered.length} missatges guardats d'avui.`);
+      return filtered;
+    }
+  } catch {}
+  return [];
+})();
+
+function guardarMissatgesDisc() {
+  fs.writeFileSync(MISSATGES_PATH, JSON.stringify(_missatgesDia, null, 2), "utf8");
+}
 
 // ── Client WhatsApp ───────────────────────────────────────────────────────────
 
@@ -96,18 +123,24 @@ client.on("ready", async () => {
       grups.forEach(g => console.log(`   • ${g.name}  →  ${g.id._serialized}`));
     }
     console.log(`⏰ Llista de divendres: ${HORA_LLISTA}:00h`);
-    console.log(`⏰ Resum de comandes:   ${HORA_RESUM}:00h\n`);
+    console.log(`⏰ Resum de comandes:   ${HORA_RESUM}:00h`);
+    if (MODE_DEMO) console.log(`🧪 MODE DEMO: ${MINUTS_DEMO} minuts entre llista i resum\n`);
+    else console.log();
   }
 
   // Programar crons (només si el grup està configurat)
   if (GRUP_ID) {
-    // Divendres a HORA_LLISTA: envia la llista de productes
-    cron.schedule(`0 ${HORA_LLISTA} * * 5`, () => enviarLlista(), { timezone: "Europe/Madrid" });
-
-    // Divendres a HORA_RESUM: envia el resum de comandes
-    cron.schedule(`0 ${HORA_RESUM} * * 5`, () => enviarResum(), { timezone: "Europe/Madrid" });
-
-    console.log("🕐 Crons programats per als divendres.\n");
+    if (MODE_DEMO) {
+      // Mode demo: envia la llista ara i extreu als 5 minuts
+      console.log("🧪 DEMO: Enviant llista ara i extreure comandes en 5 minuts...\n");
+      await enviarLlista();
+      setTimeout(() => enviarResum(), MINUTS_DEMO * 60 * 1000);
+    } else {
+      // Mode normal: programar els crons setmanals
+      cron.schedule(`0 ${HORA_LLISTA} * * 5`, () => enviarLlista(), { timezone: "Europe/Madrid" });
+      cron.schedule(`0 ${HORA_RESUM} * * 5`, () => enviarResum(), { timezone: "Europe/Madrid" });
+      console.log("🕐 Crons programats per als divendres.\n");
+    }
   }
 });
 
@@ -127,7 +160,9 @@ client.on("message", async msg => {
   const telefon   = (msg.author || msg.from).replace(/@[cg]\.us$/, "");
 
   // Guardar en silenci, sense respondre
-  _missatgesDia.push({ nom: nomClient, telefon, text });
+  const avui = new Date().toISOString().slice(0, 10);
+  _missatgesDia.push({ nom: nomClient, telefon, text, data: avui });
+  guardarMissatgesDisc();
   console.log(`📩 [${hora()}] ${nomClient || telefon}: ${text.substring(0, 80)}`);
 });
 
@@ -202,8 +237,9 @@ async function enviarResum() {
     resum += `Total: ${total} comand${total === 1 ? "a" : "es"} ✅`;
   }
 
-  // Buidar els missatges del dia
+  // Buidar els missatges del dia i el fitxer
   _missatgesDia.length = 0;
+  guardarMissatgesDisc();
 
   await chat.sendMessage(resum);
   console.log(`[${hora()}] 📊 Resum enviat al grup (${total} comandes).`);
@@ -219,7 +255,8 @@ function hora() {
 
 const args = process.argv.slice(2);
 
-// Mode test: envia la llista ara mateix sense esperar el cron
+// Mode demo: 5 minuts demo (sense flag, s'activa si --demo es passa al "ready")
+// --test-llista: envia la llista ara mateix sense esperar el cron
 if (args.includes("--test-llista")) {
   console.log("🧪 MODE TEST: connectant per enviar la llista...");
   client.on("ready", async () => {

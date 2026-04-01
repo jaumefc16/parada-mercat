@@ -230,6 +230,7 @@
 <div class="tabs">
   <div class="tab active" onclick="canviarTab('comandes')">📋 Comandes d'avui</div>
   <div class="tab" onclick="canviarTab('productes')">🧺 Productes</div>
+  <div class="tab" onclick="canviarTab('llista')">📝 Llista divendres</div>
   <div class="tab" onclick="canviarTab('manual')">✏️ Entrada manual</div>
   <div class="tab" onclick="canviarTab('simulador')">💬 Simulador</div>
 </div>
@@ -266,7 +267,14 @@
       <button class="btn btn-excel" onclick="descarregarExcel()">
         📊 Descarregar Excel del dia
       </button>
-      <p style="font-size:.78rem;color:var(--gris-text);margin-top:6px;text-align:center">Inclou dues fulles: comandes per client + resum total</p>
+      <p style="font-size:.78rem;color:var(--gris-text);margin-top:6px;margin-bottom:10px;text-align:center">Inclou dues fulles: comandes per client + resum total</p>
+
+      <button class="btn btn-primary" style="width:100%;margin-bottom:6px" onclick="window.open('/api/pdf/clients','_blank')">
+        🧾 PDF comandes per client
+      </button>
+      <button class="btn" style="width:100%;background:#E65100;color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:.9rem" onclick="window.open('/api/pdf/preparacio','_blank')">
+        📋 PDF preparació de demà
+      </button>
 
       <hr class="divider" />
 
@@ -371,6 +379,31 @@
   </div>
 </div>
 
+<!-- ══════════════ TAB: LLISTA DIVENDRES ══════════════ -->
+<div id="tab-llista" class="tab-content">
+  <div class="main-grid">
+    <div class="card" style="max-width:660px">
+      <div class="card-title">📝 Llista de productes del divendres</div>
+      <p style="font-size:.84rem;color:var(--gris-text);margin-bottom:14px">
+        Aquest missatge s'enviarà automàticament al grup cada divendres al matí. Pots usar <strong>*negreta*</strong> per destacar productes.
+      </p>
+      <textarea id="llista-editor" rows="20" oninput="actualitzarPreview()"
+        style="width:100%;font-family:monospace;font-size:.85rem;padding:10px;border:1.5px solid var(--gris-bord);border-radius:8px;resize:vertical;line-height:1.6"
+        placeholder="Escriu aquí la llista de productes..."></textarea>
+      <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+        <button class="btn btn-primary" onclick="desarLlista()">💾 Desar llista</button>
+        <span id="llista-estat" style="font-size:.83rem;color:var(--gris-text)"></span>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-title">👁 Previsualització</div>
+        <div id="llista-preview" style="font-size:.85rem;line-height:1.7;white-space:pre-line;color:#333"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ TAB: MANUAL ══════════════ -->
 <div id="tab-manual" class="tab-content">
   <div class="main-grid">
@@ -448,11 +481,12 @@ function setLoading(btn, on) {
 function canviarTab(nom) {
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-  const noms = ["comandes","productes","manual","simulador"];
+  const noms = ["comandes","productes","llista","manual","simulador"];
   document.querySelectorAll(".tab")[noms.indexOf(nom)].classList.add("active");
   $(`tab-${nom}`).classList.add("active");
   if (nom === "comandes")   { carregarComandes(); carregarConverses(); }
   if (nom === "productes")  carregarProductes();
+  if (nom === "llista")     carregarLlistaEditor();
   if (nom === "manual")     carregarComandes2();
   if (nom === "simulador")  $("wa-input").focus();
 }
@@ -825,6 +859,42 @@ async function simExtreureComandes() {
   carregarComandes();
 }
 
+
+async function carregarLlistaEditor() {
+  try {
+    const r = await fetch("/api/llista-divendres");
+    const d = await r.json();
+    $("llista-editor").value = d.text;
+    actualitzarPreview();
+  } catch {
+    $("llista-estat").textContent = "Error carregant la llista.";
+  }
+}
+
+function actualitzarPreview() {
+  const text = $("llista-editor")?.value || "";
+  // Convertir *text* a negreta per la previsualització
+  $("llista-preview").innerHTML = esc(text).replace(/\*([^*]+)\*/g, "<strong>$1</strong>");
+}
+
+async function desarLlista() {
+  const text = $("llista-editor").value.trim();
+  const estat = $("llista-estat");
+  estat.textContent = "Desant…";
+  try {
+    await fetch("/api/llista-divendres", {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ text }),
+    });
+    estat.style.color = "var(--verd)";
+    estat.textContent = "✅ Desat correctament";
+    setTimeout(() => { estat.textContent = ""; estat.style.color = ""; }, 3000);
+  } catch {
+    estat.style.color = "var(--error)";
+    estat.textContent = "❌ Error desant";
+  }
+}
 
 async function carregarLlistaSimulador(contenidor) {
   try {
